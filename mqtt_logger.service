@@ -1,0 +1,15 @@
+[Unit]
+Description=MQTT Logger
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/mosquitto_sub -v -t '#' 
+WorkingDirectory=/home/pi/mqtt_logger
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=mqtt_logger
+Restart=always
+User=pi
+
+[Install]
+WantedBy=multi-user.target
