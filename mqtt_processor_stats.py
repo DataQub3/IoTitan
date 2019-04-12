@@ -4,7 +4,7 @@
 # - Publish statistics back to same MQTT Broker
 # TODO: currently only supports plaintext.  See https://mntolia.com/mqtt-python-with-paho-mqtt-client/ for single() and multiple()
 # To run this script, need to feed it all MQTT topics from past "publish_interval" seconds
-# i.e. journalctl -u mqtt_logger --since="2019-04-11 23:08:15"  | python3 mqtt_processor_stats.py
+# journalctl -u mqtt_logger --since="`date -d "-5 min" +"%Y-%m-%d %H:%M:%S"`" | grep -v "^--" | cut -d ":" -f 4 | perl -nle 's/^\s//g; s/\s/,/g; print $_' | python3 mqtt_processor_stats.py
 
 from __future__ import print_function
 # Main methods of the paho mqtt library are: publish, subscribe, unsubscribe, connect, disconnect
@@ -13,6 +13,7 @@ import time
 import subprocess
 import pandas as pd
 import sys
+import dateutil
 
 ###   Start of user configuration   ###
 # only publish upstream periodically, e.g. every 5 minutes
@@ -34,23 +35,8 @@ use_SSL_websockets = False
 previous = time.time() # timestamps used to decide when to publish statistics
 current = time.time()
 
-def on_log(client, userdata, level, buf):
-    print("log: ". buf)
-
 def on_connect(client, userdata, rc):
     print("Connected with result code "+str(rc))
-
-def publish_statistics(client, msg, previous_time, interval):
-    #print("testing publish_statistics")
-    # use a timer to only publish once every X seconds
-    current = time.time()
-    if (current - previous_time > interval):
-        # time to publish statistics
-        print("Publish statistics")
-        # TODO fix next line. For now just print any message
-        client.publish(topic = "weatherj/stats", payload = msg.payload)
-        return current
-    return previous_time
 
 # Set up the connection parameters based on the connection type
 if use_unsecured_TCP:
@@ -74,7 +60,6 @@ if use_SSL_websockets:
 # messages from all topics to the journal.
 # Lastly, publish the results to a stats channel using MQTT
 client = mqtt.Client()
-client.on_log=on_log
 client.on_connect = on_connect
 
 print("Connecting to broker")
@@ -82,10 +67,26 @@ print("Connecting to broker")
 client.connect(mqtt_host, tPort, 60)
 
 # Read the journal from stdin
-df = pd.read_csv(sys.stdin, header=None, index_col=0)
-df.columns = ['time', 'host', 'topic', 'value']
-print(df.mean())
+df = pd.DataFrame.from_csv(sys.stdin, header=None, index_col=None)
+print("start")
 print(df)
+print(df.columns)
+print("end")
+df.columns = ['topic', 'value']
+#df.columns = ['time', 'host', 'topic', 'value']
+# Convert date from string to date times
+#df['date'] = df['date'].apply(dateutil.parser.parse, dayfirst=False)
+
+#grouped = df.groupby('topic')['value'].mean().to_frame()
+grouped = df.groupby('topic')['value'].describe().unstack()
+print(grouped.head())
+
 # publish statistics
-#current = publish_statistics(client, msg, current, publish_interval)
+# the groupby function makes the topic the index
+for index, row in grouped.iterrows():
+    #mqtt_publish(row['topic'] + '/average', row['value_mean'])
+    pub_topic = index + "/average"
+    pub_value = str(row['mean'])
+    client.publish(topic = pub_topic, payload = pub_value)
+
 
