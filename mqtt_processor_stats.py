@@ -1,7 +1,8 @@
 # MQTT STATISTICS PROCESSOR
-# - Subscribe to MQTT Broker
-# - Process statistics from data
-# - Publish statistics back to same MQTT Broker
+# - read data from stdin = all data in MQTT broker in past 5 mins
+# - Calculate statistics from data
+# - connect to a MQTT Broker
+# - Publish statistics to that MQTT Broker
 # TODO: currently only supports plaintext.  See https://mntolia.com/mqtt-python-with-paho-mqtt-client/ for single() and multiple()
 # To run this script, need to feed it all MQTT topics from past "publish_interval" seconds
 # journalctl -u mqtt_logger --since="`date -d "-5 min" +"%Y-%m-%d %H:%M:%S"`" | grep -v "^--" | cut -d ":" -f 4 | perl -nle 's/^\s//g; s/\s/,/g; print $_' | python3 mqtt_processor_stats.py
@@ -9,16 +10,16 @@
 from __future__ import print_function
 # Main methods of the paho mqtt library are: publish, subscribe, unsubscribe, connect, disconnect
 import paho.mqtt.client as mqtt
-import time
+#import time
 import subprocess
 import pandas as pd
 import sys
-import dateutil
+#import dateutil
 
 ###   Start of user configuration   ###
 # only publish upstream periodically, e.g. every 5 minutes
 publish_interval = 60
-start_time = "2019-04-11 14:08:15"
+#start_time = "2019-04-11 14:08:15"
 # Hostname of the MQTT service
 mqtt_host = "localhost"
 
@@ -32,8 +33,8 @@ use_SSL_websockets = False
 ###   End of user configuration   ###
 
 
-previous = time.time() # timestamps used to decide when to publish statistics
-current = time.time()
+#previous = time.time() # timestamps used to decide when to publish statistics
+#current = time.time()
 
 def on_connect(client, userdata, rc):
     print("Connected with result code "+str(rc))
