@@ -9,11 +9,11 @@ from __future__ import print_function
 # - publish, subscribe, unsubscribe, connect, disconnect
 import paho.mqtt.client as mqtt
 import time
-import urllib as ul
+from urllib import request, parse
 import json
 
 lastThingspeakTime = time.time()
-thingspeakInterval = 30  # post date to Thingspeak at this interval
+thingspeakInterval = 1  # post date to Thingspeak at this interval
 
 # ////////   Start of user configuration
 # ThingSpeak Channel Settings
@@ -21,7 +21,7 @@ thingspeakInterval = 30  # post date to Thingspeak at this interval
 channelID = "752701"
 # The Write API Key for the channel
 writeApiKey = "CW2MNKS3DR9GXP2X"
-url = "https://api.thingspak.com/channels/" + channelID + "/bulk_update.json"
+url = "https://api.thingspeak.com/channels/" + channelID + "/bulk_update.json"
 messageBuffer = []
 
 
@@ -30,21 +30,31 @@ def http_request():
     print("in http_request")
     global messageBuffer
     # Format the json data buffer
-    data = json.dumps({'write_api_key': writeAPIkey, 'updates': messageBuffer})
-    req = ul.request(url=url)
-    request_headers = {
-            "User-Agent": "mqtt_broker_thingspeak",
-            "Content-Type": "application/json",
-            "Content-Length": str(len(data))}
-    for key, val in request_headers.iteritems():  # Set the headers
-        req.add_header(key, val)
-    req.add_data(data)  # Add the data to the request
+    data = json.dumps({'write_api_key': writeApiKey, 'updates': messageBuffer})
+    #data = parse.urlencode(json_data).encode()
+    print("data: %s" % (data, ))
+    print("url = %s" % (url, ))
+    request_headers = {"User-Agent": "mw.doc.bulk-update (Raspberry Pi)", \
+                       "Content-Type": "application/json", \
+                       "Content-Length": str(len(data))}
+    req = request.Request(url=url, data=data, headers=request_headers)
+    print("there")
+    #for key, val in request_headers.items():  # Set the headers
+    #    print("key = %s" % (key, ))
+    #    req.add_header(key, val)
+    #req.add_data(data)  # Add the data to the request
     # Make the request to ThingSpeak
+    print("almost")
+    print("sending URL request")
     try:
-        response = ul.urlopen(req)  # Make the request
+        response = request.urlopen(req)  # Make the request
+        print(response)
         print(response.getcode())  # A 202 indicates success
-    except ul.HTTPError as e:
+    except request.HTTPError as e:
+        print("error occurred with code:")
         print(e.code)  # Print the error code
+    except:
+        print("Error occurred posting to thingspeak")
     messageBuffer = []  # Reinitialize the message buffer
 
 
@@ -55,9 +65,7 @@ def updates_json(temperature, humidity):
     print("In updatesJson")
     global lastThingspeakTime
     global thingspeakInterval
-    print("x")
     message = {}
-    print("y")
     message['delta_t'] = int(round(time.time() - lastThingspeakTime))
     if temperature > 0:
         message['field1'] = temperature
@@ -67,13 +75,16 @@ def updates_json(temperature, humidity):
     messageBuffer.append(message)
     print("testing times")
     # update the ThingSpeak channel with your data if time
-    if time.time() - lastThingspeakTime >= thingspeakInterval:
+    print("abc")
+    print("time since last update = %i" % (time.time() - lastThingspeakTime))
+    print("need to wait until %i" % thingspeakInterval)
+    if (time.time() - lastThingspeakTime) >= thingspeakInterval:
         http_request()
-    lastThingspeakTime = time.time()
+        lastThingspeakTime = time.time()
 
 
 # Hostname of the MQTT service
-mqtt_host = "localhost"
+mqtt_host = "192.168.169.233"
 tPort = 0
 
 # MQTT Connection Methods
@@ -99,10 +110,8 @@ if use_unsecured_websockets:
 if use_SSL_websockets:
     import ssl
     tTransport = "websockets"
-    tTLS = {
-            'ca_certs': "/etc/ssl/certs/ca-certificates.crt",
-            'tls_version': ssl.PROTOCOL_TLSv1
-            }
+    tTLS = {'ca_certs': "/etc/ssl/certs/ca-certificates.crt", \
+            'tls_version': ssl.PROTOCOL_TLSv1}
     tPort = 443
 
 
@@ -120,7 +129,8 @@ def on_disconnect(client, userdata, rc):
 
 
 def on_log(client, userdata, level, buf):
-    print("log: ". buf)
+    print("on_log")
+    print("log: %s" % (buf, ))
 
 
 # The callback for when a PUBLISH message is received
