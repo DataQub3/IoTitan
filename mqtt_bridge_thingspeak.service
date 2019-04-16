@@ -1,0 +1,16 @@
+[Unit]
+Description=MQTT Bridge to Thingspeak
+After=mosquitto
+
+[Service]
+User=pi
+Group=pi
+ExecStart=/usr/bin/python3 -u /home/pi/IoTitan/mqtt_bridge_thingspeak.py 
+WorkingDirectory=/home/pi/IoTitan
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=mqtt_bridge_thingspeak
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
