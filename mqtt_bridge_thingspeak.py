@@ -4,6 +4,7 @@
 # - Publish filtered data to our ThingSpeak channel
 
 from __future__ import print_function
+import sys
 # Use Paho MQTT library to connect to local MQTT broker
 # Main methods of the paho mqtt library are:
 # - publish, subscribe, unsubscribe, connect, disconnect
@@ -12,6 +13,10 @@ import time
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 import json
+
+# stderr print
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 lastThingspeakTime = time.time()
 thingspeakInterval = 1  # post date to Thingspeak at this interval
@@ -40,25 +45,24 @@ use_SSL_websockets = False
 
 def http_request():
     # Function to send the POST request to ThingSpeak channel for bulk update.
-    print("in http_request")
     global messageBuffer
     data_dict = {'write_api_key': writeApiKey, 'updates': messageBuffer}
     # Format json data as string rather than Python dict, then byte encode.
     json_data = json.dumps(data_dict).encode('utf-8')
-    print("data: %s" % (json_data, ))
+    eprint("data: %s" % (json_data, ))
     request_headers = {"User-Agent": "mw.doc.bulk-update (Raspberry Pi)", \
                        "Content-Type": "application/json", \
                        "Content-Length": str(len(json_data))}
     req = Request(url=url, data=json_data, headers=request_headers, method='POST')
-    print("sending URL request to ThingSpeak")
+    eprint("sending URL request to ThingSpeak")
     try:
         response = urlopen(req) # Make the request
-        print(response.read().decode())
-        print(response.getcode())  # A 202 indicates success
+        eprint(response.read().decode())
+        eprint(response.getcode())  # A 202 indicates success
     except Exception as inst:
-        print(type(inst))  # the exception instance
-        print(inst.args)  # arguments stored in .args
-        print(inst)  # __str__ allows args to be printed directly
+        eprint(type(inst))  # the exception instance
+        eprint(inst.args)  # arguments stored in .args
+        eprint(inst)  # __str__ allows args to be printed directly
         pass
     messageBuffer = []  # Reinitialize the message buffer
 
@@ -67,7 +71,6 @@ def update_thingspeak_rest_api(temperature, humidity):
     # Function to update the message buffer with sensor readings
     # and then call the http_request function every 2 minutes.
     # This examples uses the relative timestamp as it uses the "delta_t" param
-    print("In updatesJson")
     global lastThingspeakTime
     global thingspeakInterval
     message = {}
@@ -78,10 +81,9 @@ def update_thingspeak_rest_api(temperature, humidity):
         message['field2'] = humidity
     global messageBuffer
     messageBuffer.append(message)
-    print("testing times")
     # update ThingSpeak channel if suitable time interval
-    print("time since last update = %i" % (time.time() - lastThingspeakTime))
-    print("need to wait until %i" % thingspeakInterval)
+    eprint("time since last update = %i" % (time.time() - lastThingspeakTime))
+    eprint("need to wait until %i" % thingspeakInterval)
     if (time.time() - lastThingspeakTime) >= thingspeakInterval:
         http_request()
         lastThingspeakTime = time.time()
@@ -108,21 +110,21 @@ if use_SSL_websockets:
 
 # The callback for when the client receives a CONNACK response from the server.
 def on_connect(client, userdata, flags, rc):
-    print("Connected with result code " + str(rc))
+    eprint("Connected with result code " + str(rc))
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
     # For multiple subscriptions, put them in a list of tuples
-    client.subscribe([("/weatherj/TempAndHumid/Temperature", 0), \
-                      ("/weatherj/TempAndHumid/Humidity", 0)])  # qos=0
+    client.subscribe([("/weatherj/TempAndHumid/Temperature/average", 0), \
+                      ("/weatherj/TempAndHumid/Humidity/average", 0)])  # qos=0
 
 
 def on_disconnect(client, userdata, rc):
-    print("disconnecting reason " + str(rc))
+    eprint("disconnecting reason " + str(rc))
 
 
 def on_log(client, userdata, level, buf):
     # print("on_log")
-    print("log: %s" % (buf, ))
+    eprint("log: %s" % (buf, ))
 
 
 # The callback for when a PUBLISH message is received
@@ -131,9 +133,9 @@ def on_log(client, userdata, level, buf):
 def on_message(client, userdata, msg):
     temperature_r = -1.0  # initialise to invalid reading
     humidity_r = -1.0
-    if msg.topic == "/weatherj/TempAndHumid/Temperature":
+    if msg.topic == "/weatherj/TempAndHumid/Temperature/average":
         temperature_r = float(msg.payload.decode("utf-8"))
-    elif msg.topic == "/weatherj/TempAndHumid/Humidity":
+    elif msg.topic == "/weatherj/TempAndHumid/Humidity/average":
         humidity_r = float(msg.payload.decode("utf-8"))
     #sensor_reading = float(msg.payload.decode("utf-8"))
     #print("Sending data: field1 = %f" % (sensor_reading, ))
@@ -145,7 +147,7 @@ def on_message(client, userdata, msg):
     # "field1=" + sensor_reading)
     # send message to ThingSpeak using REST API (https post)
     update_thingspeak_rest_api(temperature_r, humidity_r)
-    print("Posted equivalent of: " + msg.topic + " " + msg.payload.decode("utf-8"))
+    eprint("Posted equivalent of: " + msg.topic + " " + msg.payload.decode("utf-8"))
     # time.sleep(15) # Thingspeak requires at least 15 seconds between updates
 
 
@@ -158,20 +160,20 @@ client.on_disconnect = on_disconnect
 client.on_message = on_message
 client.on_log = on_log
 
-print("Connecting to local MQTT broker")
+# eprint("Connecting to local MQTT broker")
 # params are: hostname, port, keepalive, bind_address
 client.connect(mqtt_host, tPort, 60)
 
-print("Subscribing to channels")
+# eprint("Subscribing to channels")
 # client.subscribe([("$SYS/#",0),("/#",0)]) #format for multiple subscriptions
-client.subscribe([("/weatherj/TempAndHumid/Temperature", 0), \
-                  ("/weatherj/TempAndHumid/Humidity", 0)])  # qos=0
+client.subscribe([("/weatherj/TempAndHumid/Temperature/average", 0), \
+                  ("/weatherj/TempAndHumid/Humidity/average", 0)])  # qos=0
 
 
-print("Looping for callbacks")
+# eprint("Looping for callbacks")
 # Blocking call that processes network traffic, dispatches callbacks and
 # handles reconnecting.
 # Other loop*() functions are available that give a threaded interface and a
 # manual interface.
 client.loop_forever()
-print("End of loop")
+eprint("End of loop")
