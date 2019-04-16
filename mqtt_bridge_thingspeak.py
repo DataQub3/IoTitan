@@ -9,56 +9,61 @@ from __future__ import print_function
 # - publish, subscribe, unsubscribe, connect, disconnect
 import paho.mqtt.client as mqtt
 import time
-from urllib import request, parse
+from urllib.request import Request, urlopen
+from urllib.parse import urlencode
 import json
 
 lastThingspeakTime = time.time()
 thingspeakInterval = 1  # post date to Thingspeak at this interval
 
-# ////////   Start of user configuration
+# ////////   Start of user configuration ////////
 # ThingSpeak Channel Settings
 # The ThingSpeak Channel ID
 channelID = "752701"
 # The Write API Key for the channel
 writeApiKey = "CW2MNKS3DR9GXP2X"
 url = "https://api.thingspeak.com/channels/" + channelID + "/bulk_update.json"
+#url = "http://httpbin.org/post"
 messageBuffer = []
 
+# Hostname of the MQTT service
+mqtt_host = "192.168.169.233"
+tPort = 0
+# MQTT Connection Methods
+# use default MQTT port 1883 (low system cost)
+use_unsecured_TCP = True
+# use unsecured websocket on port 80 (useful when 1883 blocked)
+use_unsecured_websockets = False
+# use secure websocket on port 443 (most secure)
+use_SSL_websockets = False
+# ///////   End of user configuration ////////
 
 def http_request():
     # Function to send the POST request to ThingSpeak channel for bulk update.
     print("in http_request")
     global messageBuffer
-    # Format the json data buffer
-    data = json.dumps({'write_api_key': writeApiKey, 'updates': messageBuffer})
-    #data = parse.urlencode(json_data).encode()
-    print("data: %s" % (data, ))
-    print("url = %s" % (url, ))
+    data_dict = {'write_api_key': writeApiKey, 'updates': messageBuffer}
+    # Format json data as string rather than Python dict, then byte encode.
+    json_data = json.dumps(data_dict).encode('utf-8')
+    print("data: %s" % (json_data, ))
     request_headers = {"User-Agent": "mw.doc.bulk-update (Raspberry Pi)", \
                        "Content-Type": "application/json", \
-                       "Content-Length": str(len(data))}
-    req = request.Request(url=url, data=data, headers=request_headers)
-    print("there")
-    #for key, val in request_headers.items():  # Set the headers
-    #    print("key = %s" % (key, ))
-    #    req.add_header(key, val)
-    #req.add_data(data)  # Add the data to the request
-    # Make the request to ThingSpeak
-    print("almost")
-    print("sending URL request")
+                       "Content-Length": str(len(json_data))}
+    req = Request(url=url, data=json_data, headers=request_headers, method='POST')
+    print("sending URL request to ThingSpeak")
     try:
-        response = request.urlopen(req)  # Make the request
-        print(response)
+        response = urlopen(req) # Make the request
+        print(response.read().decode())
         print(response.getcode())  # A 202 indicates success
-    except request.HTTPError as e:
-        print("error occurred with code:")
-        print(e.code)  # Print the error code
-    except:
-        print("Error occurred posting to thingspeak")
+    except Exception as inst:
+        print(type(inst))  # the exception instance
+        print(inst.args)  # arguments stored in .args
+        print(inst)  # __str__ allows args to be printed directly
+        pass
     messageBuffer = []  # Reinitialize the message buffer
 
 
-def updates_json(temperature, humidity):
+def update_thingspeak_rest_api(temperature, humidity):
     # Function to update the message buffer with sensor readings
     # and then call the http_request function every 2 minutes.
     # This examples uses the relative timestamp as it uses the "delta_t" param
@@ -74,27 +79,13 @@ def updates_json(temperature, humidity):
     global messageBuffer
     messageBuffer.append(message)
     print("testing times")
-    # update the ThingSpeak channel with your data if time
-    print("abc")
+    # update ThingSpeak channel if suitable time interval
     print("time since last update = %i" % (time.time() - lastThingspeakTime))
     print("need to wait until %i" % thingspeakInterval)
     if (time.time() - lastThingspeakTime) >= thingspeakInterval:
         http_request()
         lastThingspeakTime = time.time()
 
-
-# Hostname of the MQTT service
-mqtt_host = "192.168.169.233"
-tPort = 0
-
-# MQTT Connection Methods
-# use default MQTT port 1883 (low system cost)
-use_unsecured_TCP = True
-# use unsecured websocket on port 80 (useful when 1883 blocked)
-use_unsecured_websockets = False
-# use secure websocket on port 443 (most secure)
-use_SSL_websockets = False
-# ///////   End of user configuration
 
 # Set up the connection parameters based on the connection type
 if use_unsecured_TCP:
@@ -116,12 +107,13 @@ if use_SSL_websockets:
 
 
 # The callback for when the client receives a CONNACK response from the server.
-def on_connect(client, userdata, rc):
+def on_connect(client, userdata, flags, rc):
     print("Connected with result code " + str(rc))
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
     # For multiple subscriptions, put them in a list of tuples
-    client.subscribe("/weatherj/TempAndHumid/Temperature", 0)
+    client.subscribe([("/weatherj/TempAndHumid/Temperature", 0), \
+                      ("/weatherj/TempAndHumid/Humidity", 0)])  # qos=0
 
 
 def on_disconnect(client, userdata, rc):
@@ -129,7 +121,7 @@ def on_disconnect(client, userdata, rc):
 
 
 def on_log(client, userdata, level, buf):
-    print("on_log")
+    # print("on_log")
     print("log: %s" % (buf, ))
 
 
@@ -137,20 +129,23 @@ def on_log(client, userdata, level, buf):
 # from the server that matches our subscription.
 # Note: msg is of message class with members: topic, qos, payload, retain
 def on_message(client, userdata, msg):
-    print("hi")
-    sensor_reading = float(msg.payload.decode("utf-8"))
-    # print("Sending to ThingSpeak channel:
-    # channels/%s/publish/%s" % (channelId, apiKey))
-    print("Sending data: field1 = %s" % (sensor_reading, ))
-    # Send this message to ThinkSpeak using MQTT
+    temperature_r = -1.0  # initialise to invalid reading
+    humidity_r = -1.0
+    if msg.topic == "/weatherj/TempAndHumid/Temperature":
+        temperature_r = float(msg.payload.decode("utf-8"))
+    elif msg.topic == "/weatherj/TempAndHumid/Humidity":
+        humidity_r = float(msg.payload.decode("utf-8"))
+    #sensor_reading = float(msg.payload.decode("utf-8"))
+    #print("Sending data: field1 = %f" % (sensor_reading, ))
+    # Could send this message to ThinkSpeak using MQTT
+    # but I wasn't clear how to do a MQTT loop on two bridged servers
     # client_ts = mqtt.Client()
     # client_ts.connect("mqtt.thingspeak.com", 1883, 60)
     # client_ts.publish("channels/%s/publish/%s" % (channelId,apiKey),
     # "field1=" + sensor_reading)
     # send message to ThingSpeak using REST API (https post)
-    updates_json(sensor_reading, -1.0)
-    # break
-    print(msg.topic + " " + sensor_reading)
+    update_thingspeak_rest_api(temperature_r, humidity_r)
+    print("Posted equivalent of: " + msg.topic + " " + msg.payload.decode("utf-8"))
     # time.sleep(15) # Thingspeak requires at least 15 seconds between updates
 
 
@@ -169,11 +164,9 @@ client.connect(mqtt_host, tPort, 60)
 
 print("Subscribing to channels")
 # client.subscribe([("$SYS/#",0),("/#",0)]) #format for multiple subscriptions
-client.subscribe("/weatherj/TempAndHumid/Temperature", 0)
+client.subscribe([("/weatherj/TempAndHumid/Temperature", 0), \
+                  ("/weatherj/TempAndHumid/Humidity", 0)])  # qos=0
 
-# print("Publishing a test topic")
-# client.publish() params are: topic, payload, qos, retain flag
-# client.publish(topic = "TestTopic", payload = "This is a test message")
 
 print("Looping for callbacks")
 # Blocking call that processes network traffic, dispatches callbacks and
