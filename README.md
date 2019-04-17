@@ -1,6 +1,8 @@
 # IoTitan
 IoTitan is a scalable system for monitoring and actuating IoT devices.
 
+**For more information, see the [wiki](https://github.com/tadpoles/IoTitan/wiki)**
+
 Current implementation is limited to home use.  Weather and motion sensors send data to a MQTT Broker.  Processing agents subscribe to the MQTT broker to calculate statistics and alerts.  Time aggregated values are forwarded to the Cloud for monitoring from anywhere.
 
 ## Architecture
@@ -34,4 +36,4 @@ A script which subscribes to sensor readings of interest, and forwards the readi
 ### mqtt_bridge_thingspeak.service
 Systemd service file to start the python mqtt_bridge_thingspeak.py script and ensure it runs at all times.
 
-
+**For more information, see the [wiki](https://github.com/tadpoles/IoTitan/wiki)**
