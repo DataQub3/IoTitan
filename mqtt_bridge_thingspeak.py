@@ -21,18 +21,18 @@ def eprint(*args, **kwargs):
 lastThingspeakTime = time.time()
 thingspeakInterval = 1  # post date to Thingspeak at this interval
 
-# ////////   Start of user configuration ////////
+# ----------  Start of user configuration ----------
 # ThingSpeak Channel Settings
 # The ThingSpeak Channel ID
-channelID = "752701"
+channelID = "YOUR THINGSPEAK CHANNEL ID"
 # The Write API Key for the channel
-writeApiKey = "CW2MNKS3DR9GXP2X"
+writeApiKey = "YOUR THINGSPEAK WRITE API KEY"
 url = "https://api.thingspeak.com/channels/" + channelID + "/bulk_update.json"
 #url = "http://httpbin.org/post"
 messageBuffer = []
 
 # Hostname of the MQTT service
-mqtt_host = "192.168.169.233"
+mqtt_host = "127.0.0.1"  # customise as required
 tPort = 0
 # MQTT Connection Methods
 # use default MQTT port 1883 (low system cost)
@@ -41,7 +41,7 @@ use_unsecured_TCP = True
 use_unsecured_websockets = False
 # use secure websocket on port 443 (most secure)
 use_SSL_websockets = False
-# ///////   End of user configuration ////////
+# ---------- End of user configuration ----------
 
 def http_request():
     # Function to send the POST request to ThingSpeak channel for bulk update.
