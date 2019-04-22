@@ -85,7 +85,6 @@ def update_thingspeak_rest_api(field1, field2, field3, field4, field5):
         message['field4'] = field4
     if field5 >= 0:
         message['field5'] = field5
-
     global messageBuffer
     messageBuffer.append(message)
 
