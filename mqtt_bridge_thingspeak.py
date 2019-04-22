@@ -119,9 +119,9 @@ def on_connect(client, userdata, flags, rc):
     # reconnect then subscriptions will be renewed.
     # For multiple subscriptions, put them in a list of tuples
     client.subscribe([("iotitan/home/up_bed1/dht11/temperature/average", 0), \
-                      "iotitan/home/up_bed1/dht11/humidity/average", 0), \
-                      "iotitan/home/up_bed4/dht11/temperature/average", 0), \
-                      "iotitan/home/up_bed4/dht11/temperature/average", 0)])  # qos=0
+                      ("iotitan/home/up_bed1/dht11/humidity/average", 0), \
+                      ("iotitan/home/up_bed4/dht11/temperature/average", 0), \
+                      ("iotitan/home/up_bed4/dht11/temperature/average", 0)])  # qos=0
 
 
 def on_disconnect(client, userdata, rc):
