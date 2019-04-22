@@ -19,7 +19,7 @@ def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
 lastThingspeakTime = time.time()
-thingspeakInterval = 1  # post date to Thingspeak at this interval
+thingspeakInterval = 15  # post to Thingspeak minimum time interval
 
 # ----------  Start of user configuration ----------
 # ThingSpeak Channel Settings
@@ -67,7 +67,7 @@ def http_request():
     messageBuffer = []  # Reinitialize the message buffer
 
 
-def update_thingspeak_rest_api(temperature, humidity):
+def update_thingspeak_rest_api(field1, field2, field3, field4):
     # Function to update the message buffer with sensor readings
     # and then call the http_request function every 2 minutes.
     # This examples uses the relative timestamp as it uses the "delta_t" param
@@ -75,10 +75,14 @@ def update_thingspeak_rest_api(temperature, humidity):
     global thingspeakInterval
     message = {}
     message['delta_t'] = int(round(time.time() - lastThingspeakTime))
-    if temperature > 0:
-        message['field1'] = temperature
-    if humidity > 0:
-        message['field2'] = humidity
+    if field1 > 0:
+        message['field1'] = field1
+    if field2 > 0:
+        message['field2'] = field2
+    if field3 > 0:
+        message['field3'] = field3
+    if field4 > 0:
+        message['field4'] = field4
     global messageBuffer
     messageBuffer.append(message)
     # update ThingSpeak channel if suitable time interval
@@ -114,8 +118,10 @@ def on_connect(client, userdata, flags, rc):
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
     # For multiple subscriptions, put them in a list of tuples
-    client.subscribe([("/weatherj/TempAndHumid/Temperature/average", 0), \
-                      ("/weatherj/TempAndHumid/Humidity/average", 0)])  # qos=0
+    client.subscribe([("iotitan/home/up_bed1/dht11/temperature/average", 0), \
+                      "iotitan/home/up_bed1/dht11/humidity/average", 0), \
+                      "iotitan/home/up_bed4/dht11/temperature/average", 0), \
+                      "iotitan/home/up_bed4/dht11/temperature/average", 0)])  # qos=0
 
 
 def on_disconnect(client, userdata, rc):
@@ -131,12 +137,19 @@ def on_log(client, userdata, level, buf):
 # from the server that matches our subscription.
 # Note: msg is of message class with members: topic, qos, payload, retain
 def on_message(client, userdata, msg):
-    temperature_r = -1.0  # initialise to invalid reading
-    humidity_r = -1.0
-    if msg.topic == "/weatherj/TempAndHumid/Temperature/average":
-        temperature_r = float(msg.payload.decode("utf-8"))
-    elif msg.topic == "/weatherj/TempAndHumid/Humidity/average":
-        humidity_r = float(msg.payload.decode("utf-8"))
+    up_bed1_temperature = -1.0  # initialise to invalid reading
+    up_bed1_humidity = -1.0
+    up_bed4_temperature = -1.0  # initialise to invalid reading
+    up_bed4_humidity = -1.0
+
+    if msg.topic == "iotitan/home/up_bed1/dht11/temperature/average":
+        up_bed1_temperature = float(msg.payload.decode("utf-8"))
+    elif msg.topic == "iotitan/home/up_bed1/dht11/humidity/average":
+        up_bed1_humidity = float(msg.payload.decode("utf-8"))
+    elif msg.topic == "iotitan/home/up_bed4/dht11/temperature/average":
+        up_bed4_temperature = float(msg.payload.decode("utf-8"))
+    elif msg.topic == "iotitan/home/up_bed4/dht11/humidity/average":
+        up_bed4_humidity = float(msg.payload.decode("utf-8"))
     #sensor_reading = float(msg.payload.decode("utf-8"))
     #print("Sending data: field1 = %f" % (sensor_reading, ))
     # Could send this message to ThinkSpeak using MQTT
@@ -146,7 +159,7 @@ def on_message(client, userdata, msg):
     # client_ts.publish("channels/%s/publish/%s" % (channelId,apiKey),
     # "field1=" + sensor_reading)
     # send message to ThingSpeak using REST API (https post)
-    update_thingspeak_rest_api(temperature_r, humidity_r)
+    update_thingspeak_rest_api(up_bed1_temperature, up_bed1_humidity, up_bed4_temperature, up_bed4_humidity)
     eprint("Posted equivalent of: " + msg.topic + " " + msg.payload.decode("utf-8"))
     # time.sleep(15) # Thingspeak requires at least 15 seconds between updates
 
