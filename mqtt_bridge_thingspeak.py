@@ -85,6 +85,7 @@ def update_thingspeak_rest_api(field1, field2, field3, field4, field5):
         message['field4'] = field4
     if field5 >= 0:
         message['field5'] = field5
+
     global messageBuffer
     messageBuffer.append(message)
 
@@ -125,7 +126,7 @@ def on_connect(client, userdata, flags, rc):
                       ("iotitan/home/up_bed1/dht11/humidity/average", 0), \
                       ("iotitan/home/up_bed1/xc-4444/pir", 0), \
                       ("iotitan/home/up_bed4/dht11/temperature/average", 0), \
-                      ("iotitan/home/up_bed4/dht11/temperature/average", 0)])  # qos=0
+                      ("iotitan/home/up_bed4/dht11/humidity/average", 0)])  # qos=0
 
 
 def on_disconnect(client, userdata, rc):
@@ -186,8 +187,11 @@ client.connect(mqtt_host, tPort, 60)
 
 # eprint("Subscribing to channels")
 # client.subscribe([("$SYS/#",0),("/#",0)]) #format for multiple subscriptions
-client.subscribe([("/weatherj/TempAndHumid/Temperature/average", 0), \
-                  ("/weatherj/TempAndHumid/Humidity/average", 0)])  # qos=0
+client.subscribe([("iotitan/home/up_bed1/dht11/temperature/average", 0), \
+        ("iotitan/home/up_bed1/dht11/humidity/average", 0), \
+        ("iotitan/home/up_bed1/xc-4444/pir", 0), \
+        ("iotitan/home/up_bed4/dht11/temperature/average", 0), \
+        ("iotitan/home/up_bed4/dht11/humidity/average", 0)])  # qos=0
 
 
 # eprint("Looping for callbacks")
