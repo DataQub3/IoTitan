@@ -12,13 +12,15 @@ The current implementation is limited to home use.  Weather and motion sensors s
 ## Important Files
 
 ### mqtt_processor_stats.py
-The processor subscribes to a feed of MQTT messages for particular sensors. It calculates sensor statistics, then publishes those statistics back to MQTT.  Note: the input feed is taken from syslog to reduce load (since mqtt_logger.py already saves the data there).
+The processor subscribes to a feed of MQTT messages for particular sensors. It calculates sensor statistics, then publishes those statistics back to MQTT.
+Note: during implementation a slightly different approach was taken to reduce computational load, however it does not change the concept.  The original approach would have required the python program to subscribe to MQTT topics, read all data from those topics, maintain statistics, and then periodically publish those statistics.  That would require buffering and hence complicate the python script.
+Instead, the implementation takes input from syslog which acts as the buffer (since mqtt_logger.py already saves the data there).  Rather than running continuously, the python program is instead started by a cron job every X minutes.  Each time it is started it reads syslog data related to topics of interest, calculates statistics and publishes those statistics to MQTT.
 
 ### mqtt_processor_alerts.py
 This processor monitors particular topics by subscribing to the MQTT broker.  It creates alerts when values are outside their expected range, and publishes those alerts back to the MQTT broker.
 
 ### mqtt_logger.py
-The logger is a python script which subscribes to all topics on the Mosquitto MQTT server.  Hence it receives all sensor readings.  The logger stores everything in syslog (c.f. database) for medium-term storage.
+The logger is a python script which subscribes to all topics on the Mosquitto MQTT server.  Hence it receives all sensor readings.  The logger stores everything in syslog (c.f. database) for medium-term storage.  The advantages of this approach are  syslog auto log rotation and time-stamped messages.
 
 ### mqtt_logger.service
 Systemd service file to start the MQTT logger script and ensure it runs at all times.  A prerequisite is the Mosquitto MQTT software must be installed.  Commands to control the logger service include:
