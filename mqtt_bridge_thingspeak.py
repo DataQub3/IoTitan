@@ -52,35 +52,17 @@ def http_request():
     messageBuffer = []  # Reinitialize the message buffer
 
 
-def update_thingspeak_rest_api(temperature, humidity):
-    # Function to update the message buffer with sensor readings
-    # and then call the http_request function every 2 minutes.
-    # This examples uses the relative timestamp as it uses the "delta_t" param
-    global lastThingspeakTime
-    global thingspeakInterval
-    message = {}
-    message['delta_t'] = int(round(time.time() - lastThingspeakTime))
-    if temperature > 0:
-        message['field1'] = temperature
-    if humidity > 0:
-        message['field2'] = humidity
-    global messageBuffer
-    messageBuffer.append(message)
-    # update ThingSpeak channel if suitable time interval
-    eprint("time since last update = %i" % (time.time() - lastThingspeakTime))
-    eprint("need to wait until %i" % thingspeakInterval)
-    if (time.time() - lastThingspeakTime) >= thingspeakInterval:
-        http_request()
-        lastThingspeakTime = time.time()
-
 # The callback for when the client receives a CONNACK response from the server.
 def on_connect(client, userdata, flags, rc):
     eprint("Connected with result code " + str(rc))
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
     # For multiple subscriptions, put them in a list of tuples
-    client.subscribe([("/weatherj/TempAndHumid/Temperature/average", 0), \
-                      ("/weatherj/TempAndHumid/Humidity/average", 0)])  # qos=0
+    client.subscribe([("iotitan/home/up_bed1/dht11/temperature/average", 0), \
+                      ("iotitan/home/up_bed1/dht11/humidity/average", 0), \
+                      ("iotitan/home/up_bed1/xc-4444/pir/average", 0), \
+                      ("iotitan/home/up_bed4/dht11/temperature/average", 0), \
+                      ("iotitan/home/up_bed4/dht11/humidity/average", 0)])  # qos=0
 
 
 def on_disconnect(client, userdata, rc):
@@ -96,24 +78,30 @@ def on_log(client, userdata, level, buf):
 # from the server that matches our subscription.
 # Note: msg is of message class with members: topic, qos, payload, retain
 def on_message(client, userdata, msg):
-    temperature_r = -1.0  # initialise to invalid reading
-    humidity_r = -1.0
-    if msg.topic == "/weatherj/TempAndHumid/Temperature/average":
-        temperature_r = float(msg.payload.decode("utf-8"))
-    elif msg.topic == "/weatherj/TempAndHumid/Humidity/average":
-        humidity_r = float(msg.payload.decode("utf-8"))
-    #sensor_reading = float(msg.payload.decode("utf-8"))
-    #print("Sending data: field1 = %f" % (sensor_reading, ))
-    # Could send this message to ThinkSpeak using MQTT
-    # but I wasn't clear how to do a MQTT loop on two bridged servers
-    # client_ts = mqtt.Client()
-    # client_ts.connect("mqtt.thingspeak.com", 1883, 60)
-    # client_ts.publish("channels/%s/publish/%s" % (channelId,apiKey),
-    # "field1=" + sensor_reading)
-    # send message to ThingSpeak using REST API (https post)
-    update_thingspeak_rest_api(temperature_r, humidity_r)
-    eprint("Posted equivalent of: " + msg.topic + " " + msg.payload.decode("utf-8"))
-    # time.sleep(15) # Thingspeak requires at least 15 seconds between updates
+    global lastThingspeakTime
+    global thingspeakMaxInterval
+    global thingspeakMinInterval
+    global mesegBuffer
+    message = {}
+    message['delta_t'] = int(round(time.time() - lastThingspeakTime))
+
+    if msg.topic == "iotitan/home/up_bed1/dht11/temperature/average":
+        message['field1'] = float(msg.payload.decode("utf-8"))
+    elif msg.topic == "iotitan/home/up_bed1/dht11/humidity/average":
+        message['field2'] = float(msg.payload.decode("utf-8"))
+    elif msg.topic == "iotitan/home/up_bed1/xc-4444/pir/average":
+        message['field3'] = float(msg.payload.decode("utf-8"))
+    elif msg.topic == "iotitan/home/up_bed4/dht11/temperature/average":
+        message['field4'] = float(msg.payload.decode("utf-8"))
+    elif msg.topic == "iotitan/home/up_bed4/dht11/humidity/average":
+        message['field5'] = float(msg.payload.decode("utf-8"))
+    # update the messageBuffer with the current message
+    messageBuffer.append(message)
+    if len(messageBuffer) >= 5 and ((time.time() - lastThingspeakTime) >= thingspeakMinInterval) or ((time.time() - lastThingspeakTime) >= thingspeakMaxInterval):
+        # assume that means all 5 fields are in the messageBuffer
+        # send message to ThingSpeak using REST API (https post)
+        http_request()
+        lastThingspeakTime = time.time()
 
 
 # ////////////////////////////////////////////
@@ -125,7 +113,8 @@ if __name__ == '__main__':
         print(*args, file=sys.stderr, **kwargs)
 
     lastThingspeakTime = time.time()
-    thingspeakInterval = 1  # post date to Thingspeak at this interval
+    thingspeakMinInterval = 15  # Thingspeak only allows data to be posted once every 15 seconds
+    thingspeakMaxInterval = 600 # wait up to 10 minutes for new data to come. 
 
     # ----------  Start of user configuration ----------
     conf=Setting('iotitan.conf')
@@ -185,8 +174,11 @@ if __name__ == '__main__':
 
     # eprint("Subscribing to channels")
     # client.subscribe([("$SYS/#",0),("/#",0)]) #format for multiple subscriptions
-    client.subscribe([("/weatherj/TempAndHumid/Temperature/average", 0), \
-                      ("/weatherj/TempAndHumid/Humidity/average", 0)])  # qos=0
+    client.subscribe([("iotitan/home/up_bed1/dht11/temperature/average", 0), \
+                      ("iotitan/home/up_bed1/dht11/humidity/average", 0), \
+                      ("iotitan/home/up_bed1/xc-4444/pir/average", 0), \
+                      ("iotitan/home/up_bed4/dht11/temperature/average", 0), \
+                      ("iotitan/home/up_bed4/dht11/humidity/average", 0)])  # qos=0
 
 
     # eprint("Looping for callbacks")
