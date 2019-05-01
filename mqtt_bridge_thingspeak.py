@@ -13,35 +13,20 @@ import time
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 import json
+import configparser
 
-# stderr print
-def eprint(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
+class Setting(object):
 
-lastThingspeakTime = time.time()
-thingspeakInterval = 1  # post date to Thingspeak at this interval
+    def __init__(self, cfg_path):
+        self.cfg = configparser.ConfigParser()
+        self.cfg.read(cfg_path)
 
-# ----------  Start of user configuration ----------
-# ThingSpeak Channel Settings
-# The ThingSpeak Channel ID
-channelID = "YOUR THINGSPEAK CHANNEL ID"
-# The Write API Key for the channel
-writeApiKey = "YOUR THINGSPEAK WRITE API KEY"
-url = "https://api.thingspeak.com/channels/" + channelID + "/bulk_update.json"
-#url = "http://httpbin.org/post"
-messageBuffer = []
-
-# Hostname of the MQTT service
-mqtt_host = "127.0.0.1"  # customise as required
-tPort = 0
-# MQTT Connection Methods
-# use default MQTT port 1883 (low system cost)
-use_unsecured_TCP = True
-# use unsecured websocket on port 80 (useful when 1883 blocked)
-use_unsecured_websockets = False
-# use secure websocket on port 443 (most secure)
-use_SSL_websockets = False
-# ---------- End of user configuration ----------
+    def get_setting(self, section, my_setting):
+        try:        
+            ret = self.cfg.get(section, my_setting)
+        except configparser.NoOptionError:
+            ret = None
+        return ret
 
 def http_request():
     # Function to send the POST request to ThingSpeak channel for bulk update.
@@ -87,26 +72,6 @@ def update_thingspeak_rest_api(temperature, humidity):
     if (time.time() - lastThingspeakTime) >= thingspeakInterval:
         http_request()
         lastThingspeakTime = time.time()
-
-
-# Set up the connection parameters based on the connection type
-if use_unsecured_TCP:
-    tTransport = "tcp"
-    tPort = 1883
-    tTLS = None
-
-if use_unsecured_websockets:
-    tTransport = "websockets"
-    tPort = 80
-    tTLS = None
-
-if use_SSL_websockets:
-    import ssl
-    tTransport = "websockets"
-    tTLS = {'ca_certs': "/etc/ssl/certs/ca-certificates.crt", \
-            'tls_version': ssl.PROTOCOL_TLSv1}
-    tPort = 443
-
 
 # The callback for when the client receives a CONNACK response from the server.
 def on_connect(client, userdata, flags, rc):
@@ -154,26 +119,80 @@ def on_message(client, userdata, msg):
 # ////////////////////////////////////////////
 # Start of main
 # ////////////////////////////////////////////
-client = mqtt.Client()
-client.on_connect = on_connect
-client.on_disconnect = on_disconnect
-client.on_message = on_message
-client.on_log = on_log
+if __name__ == '__main__':
+    # define an easy way to print to stderr
+    def eprint(*args, **kwargs):
+        print(*args, file=sys.stderr, **kwargs)
 
-# eprint("Connecting to local MQTT broker")
-# params are: hostname, port, keepalive, bind_address
-client.connect(mqtt_host, tPort, 60)
+    lastThingspeakTime = time.time()
+    thingspeakInterval = 1  # post date to Thingspeak at this interval
 
-# eprint("Subscribing to channels")
-# client.subscribe([("$SYS/#",0),("/#",0)]) #format for multiple subscriptions
-client.subscribe([("/weatherj/TempAndHumid/Temperature/average", 0), \
-                  ("/weatherj/TempAndHumid/Humidity/average", 0)])  # qos=0
+    # ----------  Start of user configuration ----------
+    conf=Setting('iotitan.conf')
+    # ThingSpeak Channel Settings.  Set here or in config file.
+    channelID = conf.get_setting('THINGSPEAK', 'channelID')
+    if channelID == None:
+        channelID = "YOUR THINGSPEAK CHANNEL ID"
+    eprint('ThingSpeak channelID is : ' + channelID)
+    writeApiKey = conf.get_setting('THINGSPEAK', 'writeApiKey')
+    if writeApiKey == None:
+        writeApiKey = "YOUR THINGSPEAK WRITE API KEY"
+
+    url = "https://api.thingspeak.com/channels/" + channelID + "/bulk_update.json"
+    messageBuffer = []
+
+    # Hostname of the MQTT service
+    mqtt_host = conf.get_setting('MQTT', 'mqtt_host')
+    if mqtt_host == None:
+        mqtt_host = "YOUR MQTT SERVICE IP ADDRESS, e.g. your Raspberry Pi IP"
+    tPort = 0
+    # MQTT Connection Methods
+    # use default MQTT port 1883 (low system cost)
+    use_unsecured_TCP = True
+    # use unsecured websocket on port 80 (useful when 1883 blocked)
+    use_unsecured_websockets = False
+    # use secure websocket on port 443 (most secure)
+    use_SSL_websockets = False
+    # ---------- End of user configuration ----------
+
+    # Set up the connection parameters based on the connection type
+    if use_unsecured_TCP:
+        tTransport = "tcp"
+        tPort = 1883
+        tTLS = None
+
+    if use_unsecured_websockets:
+        tTransport = "websockets"
+        tPort = 80
+        tTLS = None
+
+    if use_SSL_websockets:
+        import ssl
+        tTransport = "websockets"
+        tTLS = {'ca_certs': "/etc/ssl/certs/ca-certificates.crt", \
+                'tls_version': ssl.PROTOCOL_TLSv1}
+        tPort = 443
+
+    client = mqtt.Client()
+    client.on_connect = on_connect
+    client.on_disconnect = on_disconnect
+    client.on_message = on_message
+    client.on_log = on_log
+
+    # eprint("Connecting to local MQTT broker")
+    # params are: hostname, port, keepalive, bind_address
+    client.connect(mqtt_host, tPort, 60)
+
+    # eprint("Subscribing to channels")
+    # client.subscribe([("$SYS/#",0),("/#",0)]) #format for multiple subscriptions
+    client.subscribe([("/weatherj/TempAndHumid/Temperature/average", 0), \
+                      ("/weatherj/TempAndHumid/Humidity/average", 0)])  # qos=0
 
 
-# eprint("Looping for callbacks")
-# Blocking call that processes network traffic, dispatches callbacks and
-# handles reconnecting.
-# Other loop*() functions are available that give a threaded interface and a
-# manual interface.
-client.loop_forever()
-eprint("End of loop")
+    # eprint("Looping for callbacks")
+    # Blocking call that processes network traffic, dispatches callbacks and
+    # handles reconnecting.
+    # Other loop*() functions are available that give a threaded interface and a
+    # manual interface.
+    client.loop_forever()
+    eprint("End of loop")
