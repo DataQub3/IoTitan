@@ -63,7 +63,10 @@ def on_connect(client, userdata, flags, rc):
                       ("iotitan/home/up_bed1/dht11/humidity/average", 0), \
                       ("iotitan/home/up_bed1/xc-4444/pir/average", 0), \
                       ("iotitan/home/up_bed4/dht11/temperature/average", 0), \
-                      ("iotitan/home/up_bed4/dht11/humidity/average", 0)])  # qos=0
+                      ("iotitan/home/up_bed4/dht11/humidity/average", 0), \
+                      ("iotitan/home/downstairs/dht22/temperature/average", 0), \
+                      ("iotitan/home/downstairs/dht22/humidity/average", 0)])  # qos=0
+
 
 
 def on_disconnect(client, userdata, rc):
@@ -97,6 +100,11 @@ def on_message(client, userdata, msg):
         message['field4'] = float(msg.payload.decode("utf-8"))
     elif msg.topic == "iotitan/home/up_bed4/dht11/humidity/average":
         message['field5'] = float(msg.payload.decode("utf-8"))
+    elif msg.topic == "iotitan/home/downstairs/dht22/temperature/average":
+        message['field6'] = float(msg.payload.decode("utf-8"))
+    elif msg.topic == "iotitan/home/downstairs/dht22/humidity/average":
+        message['field7'] = float(msg.payload.decode("utf-8"))
+
     # update the messageBuffer with the current message
     messageBuffer.append(message)
     if len(messageBuffer) >= 5 and ((time.time() - lastThingspeakTime) >= thingspeakMinInterval) or ((time.time() - lastThingspeakTime) >= thingspeakMaxInterval):
@@ -180,7 +188,9 @@ if __name__ == '__main__':
                       ("iotitan/home/up_bed1/dht11/humidity/average", 0), \
                       ("iotitan/home/up_bed1/xc-4444/pir/average", 0), \
                       ("iotitan/home/up_bed4/dht11/temperature/average", 0), \
-                      ("iotitan/home/up_bed4/dht11/humidity/average", 0)])  # qos=0
+                      ("iotitan/home/up_bed4/dht11/humidity/average", 0), \
+                      ("iotitan/home/downstairs/dht22/temperature/average", 0), \
+                      ("iotitan/home/downstairs/dht22/humidity/average", 0)])  # qos=0
 
 
     # eprint("Looping for callbacks")
