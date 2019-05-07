@@ -10,6 +10,7 @@ import sys
 # - publish, subscribe, unsubscribe, connect, disconnect
 import paho.mqtt.client as mqtt
 import time
+import math
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 import json
@@ -83,7 +84,8 @@ def on_message(client, userdata, msg):
     global thingspeakMinInterval
     global mesegBuffer
     message = {}
-    message['delta_t'] = int(round(time.time() - lastThingspeakTime))
+    # delta_t = 0 is not allowed, so use ceiling math function
+    message['delta_t'] = int(math.ceil(time.time() - lastThingspeakTime))
 
     if msg.topic == "iotitan/home/up_bed1/dht11/temperature/average":
         message['field1'] = float(msg.payload.decode("utf-8"))
