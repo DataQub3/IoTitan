@@ -15,6 +15,7 @@ from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 import json
 import configparser
+import argparse
 
 class Setting(object):
 
@@ -113,12 +114,20 @@ if __name__ == '__main__':
     def eprint(*args, **kwargs):
         print(*args, file=sys.stderr, **kwargs)
 
+    # handle command-line arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', help='configuration file for the program, default iotitan.conf')
+    args = parser.parse_args()
+
     lastThingspeakTime = time.time()
     thingspeakMinInterval = 15  # Thingspeak only allows data to be posted once every 15 seconds
     thingspeakMaxInterval = 600 # wait up to 10 minutes for new data to come. 
 
     # ----------  Start of user configuration ----------
-    conf=Setting('iotitan.conf')
+    if args.config:
+        conf=Setting(args.config)
+    else:
+        conf=Setting('iotitan.conf')
 
     # ThingSpeak Channel Settings.  Set here or in config file.
     channelID = conf.get_setting('THINGSPEAK', 'channelID')
