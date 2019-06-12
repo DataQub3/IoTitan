@@ -1,5 +1,12 @@
 [THINGSPEAK]
 channelID = 012345 
 writeApiKey = ABCDEFGHIJKLMNOP
+
 [MQTT]
 mqtt_host = 192.168.1.16
+
+[MQTT_TOPICS]
+# Format is: "MQTT topic = thingspeak field ID"
+# e.g.
+# buildingA/floor9/room2/temperature = field1
+
