@@ -33,12 +33,14 @@ This bridge is a script which subscribes to particular sensor readings (normally
 
 Note: for sensors which do not send their readings periodically, we could inject default readings.  This is not currently used, since the ESPEasy firmware on the ESP8266 attached to each sensor can send readings every X seconds in all cases.
 e.g. to inject field3 when it is missing:
+
+```
 +        if not(any('field3' in x for x in messageBuffer)):
 +            tempMessage = {} # a temporary dictionary
 +            tempMessage['delta_t'] = int(math.ceil(time.time() - lastThingspeakTime))
 +            tempMessage['field3'] = 0
 +            messageBuffer.append(tempMessage)
-
+```
 
 ### mqtt_bridge_thingspeak.service
 This systemd service file starts the python mqtt_bridge_thingspeak.py script and ensures it runs at all times.
