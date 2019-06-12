@@ -29,6 +29,14 @@ class Setting(object):
             ret = None
         return ret
 
+    def get_topics(self):
+        try:
+            # get topics defined in section with this name
+            ret = self.cfg['MQTT_TOPICS']
+        except configparser.NoOptionError:
+            ret = None
+        return ret
+
 def http_request():
     # Function to send the POST request to ThingSpeak channel for bulk update.
     global messageBuffer
@@ -55,18 +63,11 @@ def http_request():
 
 # The callback for when the client receives a CONNACK response from the server.
 def on_connect(client, userdata, flags, rc):
+    global topicList
     eprint("Connected with result code " + str(rc))
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
-    # For multiple subscriptions, put them in a list of tuples
-    client.subscribe([("iotitan/home/up_bed1/dht11/temperature/average", 0), \
-                      ("iotitan/home/up_bed1/dht11/humidity/average", 0), \
-                      ("iotitan/home/up_bed1/xc-4444/pir/average", 0), \
-                      ("iotitan/home/up_bed4/dht11/temperature/average", 0), \
-                      ("iotitan/home/up_bed4/dht11/humidity/average", 0), \
-                      ("iotitan/home/downstairs/dht22/temperature/average", 0), \
-                      ("iotitan/home/downstairs/dht22/humidity/average", 0)])  # qos=0
-
+    client.subscribe(topicList)
 
 
 def on_disconnect(client, userdata, rc):
@@ -85,34 +86,24 @@ def on_message(client, userdata, msg):
     global lastThingspeakTime
     global thingspeakMaxInterval
     global thingspeakMinInterval
-    global mesegBuffer
+    global messageBuffer
+    global topics
+
     message = {}
-    # delta_t = 0 is not allowed, so use ceiling math function
-    message['delta_t'] = int(math.ceil(time.time() - lastThingspeakTime))
 
-    if msg.topic == "iotitan/home/up_bed1/dht11/temperature/average":
-        message['field1'] = float(msg.payload.decode("utf-8"))
-    elif msg.topic == "iotitan/home/up_bed1/dht11/humidity/average":
-        message['field2'] = float(msg.payload.decode("utf-8"))
-    elif msg.topic == "iotitan/home/up_bed1/xc-4444/pir/average":
-        message['field3'] = float(msg.payload.decode("utf-8"))
-    elif msg.topic == "iotitan/home/up_bed4/dht11/temperature/average":
-        message['field4'] = float(msg.payload.decode("utf-8"))
-    elif msg.topic == "iotitan/home/up_bed4/dht11/humidity/average":
-        message['field5'] = float(msg.payload.decode("utf-8"))
-    elif msg.topic == "iotitan/home/downstairs/dht22/temperature/average":
-        message['field6'] = float(msg.payload.decode("utf-8"))
-    elif msg.topic == "iotitan/home/downstairs/dht22/humidity/average":
-        message['field7'] = float(msg.payload.decode("utf-8"))
+    # Lookup dictionary of topics to find which Thingspeak field to publish as.
+    if msg.topic in topics:
+        # delta_t = 0 is not allowed, so use ceiling math function
+        message['delta_t'] = int(math.ceil(time.time() - lastThingspeakTime))
+        # e.g. message['field1'] = float(msg.payload.decode("utf-8"))
+        message[topics.get(msg.topic)] =float(msg.payload.decode("utf-8"))
 
-    # update the messageBuffer with the current message
-    messageBuffer.append(message)
-    if len(messageBuffer) >= 5 and ((time.time() - lastThingspeakTime) >= thingspeakMinInterval) or ((time.time() - lastThingspeakTime) >= thingspeakMaxInterval):
-        # assume that means all 5 fields are in the messageBuffer
-        # send message to ThingSpeak using REST API (https post)
-        http_request()
-        lastThingspeakTime = time.time()
-
+        # update the messageBuffer with the current message
+        messageBuffer.append(message)
+        if len(messageBuffer) >= len(topicList) and ((time.time() - lastThingspeakTime) >= thingspeakMinInterval) or ((time.time() - lastThingspeakTime) >= thingspeakMaxInterval):
+            # Now all fields are in messageBuffer, send to ThingSpeak using REST API (https post)
+            http_request()
+            lastThingspeakTime = time.time()
 
 # ////////////////////////////////////////////
 # Start of main
@@ -128,6 +119,7 @@ if __name__ == '__main__':
 
     # ----------  Start of user configuration ----------
     conf=Setting('iotitan.conf')
+
     # ThingSpeak Channel Settings.  Set here or in config file.
     channelID = conf.get_setting('THINGSPEAK', 'channelID')
     if channelID == None:
@@ -145,6 +137,20 @@ if __name__ == '__main__':
     if mqtt_host == None:
         mqtt_host = "YOUR MQTT SERVICE IP ADDRESS, e.g. your Raspberry Pi IP"
     tPort = 0
+    # MQTT topics
+    topics = {}
+    topics = conf.get_topics()
+    for key in topics:
+        print(key)
+        print(topics[key])
+
+    # Make a list of these topics suitable for the MQTT client API
+    # e.g. for two topics, format is: client.subscribe([("$SYS/#",0),("/#",0)])
+    topicList = []
+    for key in topics:
+        # to the list, append a tuple consisting of topic name and zero to indicate MQTT mode.
+        topicList.append((key, 0))
+
     # MQTT Connection Methods
     # use default MQTT port 1883 (low system cost)
     use_unsecured_TCP = True
@@ -183,15 +189,7 @@ if __name__ == '__main__':
     client.connect(mqtt_host, tPort, 60)
 
     # eprint("Subscribing to channels")
-    # client.subscribe([("$SYS/#",0),("/#",0)]) #format for multiple subscriptions
-    client.subscribe([("iotitan/home/up_bed1/dht11/temperature/average", 0), \
-                      ("iotitan/home/up_bed1/dht11/humidity/average", 0), \
-                      ("iotitan/home/up_bed1/xc-4444/pir/average", 0), \
-                      ("iotitan/home/up_bed4/dht11/temperature/average", 0), \
-                      ("iotitan/home/up_bed4/dht11/humidity/average", 0), \
-                      ("iotitan/home/downstairs/dht22/temperature/average", 0), \
-                      ("iotitan/home/downstairs/dht22/humidity/average", 0)])  # qos=0
-
+    client.subscribe(topicList)
 
     # eprint("Looping for callbacks")
     # Blocking call that processes network traffic, dispatches callbacks and
