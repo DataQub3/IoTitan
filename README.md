@@ -3,7 +3,7 @@ IoTitan is a scalable system for monitoring and actuating IoT devices.
 
 **For more information, see the [wiki](https://github.com/DataQub3/IoTitan/wiki)**
 
-The current implementation is limited to home use.  Weather and motion sensors send data to a MQTT Broker.  Processing agents subscribe to the MQTT broker to calculate statistics and alerts.  Time aggregated values are forwarded to the Cloud for monitoring from anywhere.
+The current implementation is limited to home use cases.  Weather and motion sensors send data to a MQTT Broker.  Processing agents subscribe to the MQTT broker to calculate statistics and alerts.  Time aggregated values are forwarded to the Cloud for monitoring from anywhere.
 
 ## Architecture
 ![IoTitan Architecture](img/IoT_architecture_crop.png "IoTitan Architecture")
