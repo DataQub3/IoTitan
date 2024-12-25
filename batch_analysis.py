@@ -1,3 +1,7 @@
+'''
+Script to parse all syslog files saved by IoTitan and convert them to csv for visualization.
+Example usage: python ../IoTitan/batch_analysis.py | sort -n > iotitan_20241225_data_sorted.csv
+'''
 import os
 import re
 import gzip
@@ -34,31 +38,39 @@ for file_path in found_files:
         mode = 'r'  # Read text mode for regular files
 
     with open_func(file_path, mode) as file:
+        print(f"File={file_path}")
         for line in file:
             # rule1: only process lines containing the string "mqtt_logger", ignore all other lines
             if "mqtt_logger" not in line:
                 continue
 
             # rule2: match the timestamp at the start of the line with format "Dec 25 05:09:04"
-            timestamp_match = re.match(r"^[A-Z][a-z]{2} \d{2} \d{2}:\d{2}:\d{2}", line)
+            timestamp_match = re.match(r"^[A-Za-z]{3}\s+\d+\s+\d{2}:\d{2}:\d{2}", line)
             if not timestamp_match:
+                print(f"#ERROR: invalid timestamp in line {line}")
                 continue
             timestamp_str = timestamp_match.group(0)
 
             # Convert timestamp to Unix time format using the extracted or current year
-            timestamp_dt = datetime.strptime(timestamp_str, "%b %d %H:%M:%S")
+            try:
+                timestamp_dt = datetime.strptime(timestamp_str, "%b %d %H:%M:%S")
+            except ValueError:
+                print(f"#ERROR: invalid timestamp for conversion to unixtime in line {line}")
+                continue
             timestamp_dt = timestamp_dt.replace(year=year)
             timestamp_unix = int(timestamp_dt.timestamp())
 
             # rule3: match the name of the sensor which is the string starting with "iotitan/home/"
             sensor_name_match = re.search(r"iotitan/home/\S+", line)
             if not sensor_name_match:
+                print(f"#ERROR: invalid sensor name in line {line}")
                 continue
             sensor_name = sensor_name_match.group(0)
 
             # rule4: match the value of the sensor which is the number following the sensor name
-            sensor_value_match = re.search(r"iotitan/home/\S+ (\d+)", line)
+            sensor_value_match = re.search(r"iotitan/home/\S+ (.*)$", line)
             if not sensor_value_match:
+                print(f"#ERROR: invalid sensor value in line {line}")
                 continue
             sensor_value = sensor_value_match.group(1)
 
